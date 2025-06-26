@@ -17,14 +17,12 @@ import { User } from '../models';
 import { SanitizedUser } from '../types/auth-request';
 import RefreshToken from '../models/refresh-token.model';
 import { sequelize } from '../config/database';
+import logger from '../config/logger';
 
 const sessionModel = createModelWrapper(Session);
 const refreshTokenModel = createModelWrapper(RefreshToken);
 
-// Кастомный тип для создания, исключая несовместимости
-type SessionCreateInput = Omit<SessionCreationAttributes, 'id' | 'userAgent'> & {
-  userAgent?: string; // Только string или undefined
-};
+
 
 export class AuthService {
   private userService: UserService;
@@ -35,8 +33,10 @@ export class AuthService {
 
   async register(registerDto: RegisterUserDto) {
     const { email, name, password, confirmPassword } = registerDto;
+    logger.info(`Registering user with email ${email}`);
 
     if(password !== confirmPassword) {
+      logger.error("Passwords don't match");
       throw new Error("Password don't match");
     }
     
@@ -58,6 +58,7 @@ export class AuthService {
       name.trim(),
       hashedPassword
     );
+    logger.info('User is successfully registered');
 
     // Возвращаем пользователя без чувствительных данных
     return this.sanitizeUser(user);
@@ -66,37 +67,32 @@ export class AuthService {
   // Аутентификация пользователя
   async login(dto: LoginUserDto) {
     const { email, password } = dto;
-    
-    // Нормализация email
     const normalizedEmail = email.toLowerCase().trim();
     
-    // Поиск пользователя
+    logger.info(`Login attempt for: ${normalizedEmail}`);
+    
     const user = await this.userService.findByEmail(normalizedEmail);
-    
-    // Общая ошибка для безопасности (защита от перебора)
-    const invalidError = new Error('Invalid email or password');
-    
     if (!user) {
-      // Задержка для защиты от timing-атак
-      setTimeout( () => {}, 500 );
-      throw invalidError;
+      logger.warn('User not found');
+      await new Promise(resolve => setTimeout(resolve, 500));
+      throw new Error('Invalid credentials');
     }
   
-    // Безопасное сравнение паролей
-    const isPasswordValid = await this.comparePasswords(
-      password, 
-      user.password
-    );
-    
+    const isPasswordValid = await this.comparePasswords(password, user.password);
     if (!isPasswordValid) {
-      throw invalidError;
+      logger.warn('Incorrect password');
+      throw new Error('Invalid credentials');
     }
   
-    // Генерация токенов
-    const tokens = await this.generateTokens(user);
-    
-    // Сохранение refreshToken в базу
-    await this.saveRefreshToken(user.id, await tokens.refreshToken);
+    // Генерация токенов с единым источником секретов
+    const accessToken = generateAccessToken(user.id);
+    const refreshToken = generateRefreshToken(user.id)
+  
+    logger.info(`Access token generated with secret: ${Config.JWT_ACCESS_SECRET}`);
+    logger.info(`Refresh token generated with secret: ${Config.JWT_ACCESS_SECRET}`);
+  
+    // Сохранение refreshToken
+    await this.saveRefreshToken(user.id, refreshToken);
   
     return {
       user: {
@@ -104,12 +100,11 @@ export class AuthService {
         email: user.email,
         name: user.name
       },
-      accessToken: tokens.accessToken,
-      refreshToken: tokens.refreshToken
+      accessToken,
+      refreshToken
     };
   }
-
-
+  
     
   private async createSession(userId: number, userAgent?: string): Promise<Session> {
     const refreshToken = this.generateSecureToken();
@@ -310,7 +305,7 @@ export class AuthService {
       await transaction.commit();
     } catch (error) {
       await transaction.rollback();
-      console.error('Token rotation failed:', error);
+      logger.error('Token rotation failed:', error);
       throw new Error('Token rotation error');
     }
   }

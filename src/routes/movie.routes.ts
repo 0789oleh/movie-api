@@ -7,6 +7,7 @@ const router = express.Router();
 
 router.post('/',  controllerAdapter(movieController.createMovie));
 router.delete('/:id',  controllerAdapter(movieController.deleteMovie));
+router.get('/', controllerAdapter(movieController.findMovies));
 router.patch('/:id',  controllerAdapter(movieController.updateMovie));
 router.get('/:id',  controllerAdapter(movieController.findMovieById));
 router.post('/import',  multerMiddleware, movieController.importMovies);

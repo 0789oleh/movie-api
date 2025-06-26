@@ -14,7 +14,3 @@ export interface FailedImportEntry {
 export interface MulterRequest extends Request {
   file?: File;
 }
-
-// interface MulterFile extends Express.Multer.File {
-//   buffer: Buffer;
-// }

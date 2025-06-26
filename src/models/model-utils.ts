@@ -7,7 +7,9 @@ import {
   FindAndCountOptions,
   UpdateOptions,
   DestroyOptions,
-  Transaction  // Добавляем импорт
+  Transaction,  
+  BulkCreateOptions,
+  CreationAttributes
 } from 'sequelize';
 
 type ModelWrapper<T extends Model> = {
@@ -22,23 +24,23 @@ type ModelWrapper<T extends Model> = {
     defaults: Partial<T>;
     transaction?: Transaction;
   }): Promise<[T, boolean]>;
-  // Исправленный метод update
+
   update(
     values: Partial<T>, 
     options: UpdateOptions
   ): Promise<[affectedCount: number]>;
+  bulkCreate(records: ReadonlyArray<CreationAttributes<T>>, options: BulkCreateOptions): Promise<T[]>;
   destroy(
     options: DestroyOptions
   ): Promise<number>;
   
-  // Добавьте другие методы по необходимости
 };
 
 export function createModelWrapper<T extends Model>(modelClass: ModelStatic<T>): ModelWrapper<T> {
   
   return {
     create: (values, options) => {
-      // Преобразование null в undefined для совместимости
+      // Casting null into undefined for compatibility
       const processedValues = Object.fromEntries(
         Object.entries(values || {}).map(([key, value]) => 
           [key, value === null ? undefined : value]
@@ -58,8 +60,8 @@ export function createModelWrapper<T extends Model>(modelClass: ModelStatic<T>):
         transaction
       });
     },
+    bulkCreate: (records, options) => modelClass.bulkCreate(records, options),
     destroy: (options) => modelClass.destroy(options),
-    // Исправленная реализация update
     update: (values, options) => modelClass.update(values, options)
   };
 }

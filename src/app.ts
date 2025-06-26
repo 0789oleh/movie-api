@@ -1,17 +1,18 @@
 import express from 'express';
 import movieRoutes from './routes/movie.routes';
-// import requestLogger from './middleware/requestLogger.js';
+import requestLogger from './middleware/request-logger';
 import userRoutes from './routes/user.routes';
 import sessionRoutes from './routes/session.routes';
 import authMiddleware from './middleware/auth';
 import { ValidationError } from 'sequelize';
 import  { NextFunction, Request, Response } from 'express';
 import cookieParser from 'cookie-parser';
+import logger from './config/logger';
 
 const app = express();
 
 app.use(express.json());
-// app.use(requestLogger);
+app.use(requestLogger);
 
 app.use(cookieParser());
 
@@ -22,14 +23,14 @@ app.use('/api/v1/users', userRoutes);
 app.use('/api/v1/sessions', sessionRoutes);
 
 app.use((error: unknown, req: Request, res: Response, next: NextFunction) => {
-    // Логирование ошибки
-    console.error('Error handler:', error);
+  
+    logger.error('Error handler:', error);
     
     let status = 500;
     let message = 'Internal Server Error';
     let details: any = null;
   
-    // Обработка разных типов ошибок
+    // Error handlingd
     if (error instanceof Error) {
       message = error.message;
       
@@ -43,7 +44,7 @@ app.use((error: unknown, req: Request, res: Response, next: NextFunction) => {
         details = error.errors.map(e => e.message);
       }
     }
-  // Формирование ответа
+  // Responce building
   const response: any = {
     status: 'error',
     message

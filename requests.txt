@@ -1,0 +1,65 @@
+Login
+
+curl --location 'http://localhost:8000/api/v1/sessions' \
+  --header 'Content-Type: application/json' \
+  --data-raw '{"email": "petro@gmail.com", "password": "super-password"}'
+  
+
+Pushing movie
+
+
+curl --location 'http://localhost:8000/api/v1/movies' \
+--header 'Content-Type: application/json' \
+--header 'Authorization: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjIsImlhdCI6MTc1MDc2MjA1OCwiZXhwIjoxNzUwNzYyOTU4fQ.T_21PFOVA_JDv7xzAvBVCsT514ZktNcnASMp-RKB_jA' \
+--data '{
+    "title": "Blazing Saddles",
+    "year": 1974,
+    "format": "VHS",
+    "actors": [
+        "Mel Brooks",
+        "Clevon Little",
+        "Harvey Korman",
+        "Gene Wilder",
+        "Slim Pickens",
+        "Madeline Kahn"
+    ]
+}'  
+
+List
+
+curl --location 'http://localhost:8000/api/v1/movies?sort=year&order=DESC&limit=10&offset=0' \
+--header 'Authorization: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjEsImlhdCI6MTc1MDg2MDQ0OCwiZXhwIjoxNzUwODYxMzQ4fQ.O46YzKu-Qh3sDqs67Mi8LHqs1kRI4vJaH8Hi4M8WeZI'
+  
+Update
+  
+curl --location --request PATCH 'http://localhost:8000/api/v1/movies/1' \
+--header 'Content-Type: application/json' \
+--header 'Authorization: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjEsImlhdCI6MTc1MDg1OTQxMywiZXhwIjoxNzUwODYwMzEzfQ.o5VCusuJ6Q4u4hyN2b05PGmU-tK1VpIhtIuc53Q47z8' \
+--data '{
+    "title": "Casablanca",
+    "year": 1942,
+    "format": "DVD",
+    "actors": [
+        "Humphrey Bogart",
+        "Ingrid Bergman",
+        "Claude Rains",
+        "Peter Lorre"
+    ]
+}'
+
+Show
+
+curl --location 'http://localhost:8000/api/v1/movies/1' \
+--header 'Authorization: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjEsImlhdCI6MTc1MDg1OTczMywiZXhwIjoxNzUwODYwNjMzfQ.nGdbG_vfZD3MBek3NOfhIyanev1-6jzhuIKoQNRPlIk'\
+
+
+Delete
+
+curl --location --request DELETE 'http://localhost:8000/api/v1/movies/1' \
+--header 'Authorization: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjEsImlhdCI6MTc1MDg1OTczMywiZXhwIjoxNzUwODYwNjMzfQ.nGdbG_vfZD3MBek3NOfhIyanev1-6jzhuIKoQNRPlIk'
+
+Import
+
+curl --location 'http://localhost:8000/api/v1/movies/import' \
+--header 'Authorization: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjEsImlhdCI6MTc1MDg1OTczMywiZXhwIjoxNzUwODYwNjMzfQ.nGdbG_vfZD3MBek3NOfhIyanev1-6jzhuIKoQNRPlIk' \
+--form 'movies=@"https://github.com/0789oleh/movie-api/movies.txt"'

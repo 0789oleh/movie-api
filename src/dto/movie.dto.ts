@@ -1,38 +1,40 @@
 // src/dto/movie.dto.ts
-import { isIn, IsIn, IsNotEmpty, IsNumber, IsOptional, IsString, validateSync } from 'class-validator';
+import { IsIn, IsNumber, IsOptional, IsString, Max, Min, validateSync } from 'class-validator';
 import MovieFormat from '../models/movie.model';
+import logger from '../config/logger';
 
 // Movie creation
 export class CreateMovieDto {
+  @IsString()
+  title!: string;
+
+  @Min(1888)
+  @Max(new Date().getFullYear() + 5)
+  year!: number;
 
   @IsString()
-  @IsNotEmpty({message: 'Title is required!'})
-  title: string;
+  @IsIn(['VHS', 'DVD', 'Blu-ray']) // Важно: значения в кавычках!
+  format!: string;
 
-  @IsNumber()
-  year: number;
-
-  @IsString()
-  @IsIn([MovieFormat])
-  format: string;
-
-
-  actors: string[]; // Массив имен актеров
+  @IsString({ each: true })
+  actors!: string[];
 
   static validate(data: Partial<CreateMovieDto>) {
+    logger.info('Validating DTO:', data);
     const dto = Object.assign(new CreateMovieDto(), data);
     const errors = validateSync(dto);
-      
+    logger.info('Validation errors:', errors);
     if (errors.length > 0) {
       const errorMessages = errors.map(error => 
         Object.values(error.constraints || {}).join(', ')
       );
       throw new Error(errorMessages.join('; '));
     }
-      
     return dto;
   }
+  
 }
+
 
 // Movie update
 export class UpdateMovieDto {
@@ -44,7 +46,7 @@ export class UpdateMovieDto {
   year?: number;
 
   @IsString()
-  @IsIn([MovieFormat])
+  @IsIn(['VHS', 'DVD', 'Blu-ray'])
   format?: string;
 
 

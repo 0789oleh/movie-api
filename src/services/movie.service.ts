@@ -1,5 +1,5 @@
 import  Op from 'sequelize-typescript';
-import { Optional, QueryTypes } from 'sequelize'
+import { Attributes, BulkCreateOptions, CreationAttributes, Optional, QueryTypes } from 'sequelize'
 import { Transaction } from 'sequelize';
 import WhereOptions from 'sequelize-typescript';
 import Movie from '../models/movie.model';
@@ -8,10 +8,21 @@ import { CreateMovieDto, MovieSearchDto, UpdateMovieDto } from '../dto/movie.dto
 import { sequelize } from '../config/database';
 import { createModelWrapper } from '../models/model-utils';
 import { NullishPropertiesOf } from 'sequelize/types/utils';
+import { MovieActor } from '../models';
+import logger from '../config/logger';
 
 
 const movieModel = createModelWrapper(Movie);
 const actorModel = createModelWrapper(Actor);
+const movieActorModel = createModelWrapper(MovieActor);
+
+
+interface GetMoviesOptions {
+  sort?: string;
+  order?: 'ASC' | 'DESC';
+  limit?: number;
+  offset?: number;
+}
 
 
 class MovieService {
@@ -19,191 +30,199 @@ class MovieService {
   
   async createMovie(data: CreateMovieDto, transaction?: Transaction): Promise<Movie> {
     const { title, year, format, actors } = data;
-    
-    const movie = await movieModel.create({
-      title,
-      year,
-      format
-    }, { transaction });
-
-    const actorEntities = await Promise.all(
-      actors.map(name => 
-        actorModel.findOrCreate({
-          where: { name },
-          defaults: { name } as Partial<ActorAttributes>,
-          transaction
-        })
-      )
-    );
-
-    await (movie as any).$set(
-      'actors', 
-      actorEntities.map(([actor]) => actor),
-      { transaction }
-    );
-
-    return movie;
-  }
-
   
-
-  async searchMovies(
-    searchDto: MovieSearchDto,
-    transaction?: Transaction
-  ): Promise<{ movies: Movie[]; totalCount: number }> {
-    // Валидация и нормализация параметров
-    const {
-      search,
-      title,
-      actor,
-      sort = 'id',
-      order = 'ASC',
-      limit = 20,
-      offset = 0
-    } = searchDto;
+    const t = transaction || await sequelize.transaction();
   
-    // Валидация параметров сортировки
-    const allowedSortFields = ['title', 'year', 'id', 'createdAt'];
-    const sortField = allowedSortFields.includes(sort) ? sort : 'title';
-    const sortDirection = order.toUpperCase() === 'DESC' ? 'DESC' : 'ASC';
-    const safeLimit = Math.min(limit, 100);
+    try {
+      const movie = await movieModel.create({ title, year, format }, { transaction: t });
   
-      // Параметры для плейсхолдеров
-  const params: any = {
-    limit: safeLimit,
-    offset
-  };
-
-  let whereClause = '';
-  let joinClause = '';
-  let havingClause = '';
-
-  if (search) {
-    params.search = `%${search}%`;
-    whereClause = `
-      WHERE m.title ILIKE :search 
-      OR EXISTS (
-        SELECT 1 FROM "MovieActors" ma
-        JOIN "Actors" a ON ma."actorId" = a.id
-        WHERE ma."movieId" = m.id
-        AND a.name ILIKE :search
-      )
-    `;
-  } else {
-    if (title) {
-      params.title = `%${title}%`;
-      whereClause = `WHERE m.title ILIKE :title`;
-    }
-    
-    if (actor) {
-      params.actor = `%${actor}%`;
-      whereClause = whereClause 
-        ? `${whereClause} AND a.name ILIKE :actor` 
-        : `WHERE a.name ILIKE :actor`;
-      
-      joinClause = `JOIN "MovieActors" ma ON m.id = ma."movieId"
-                    JOIN "Actors" a ON ma."actorId" = a.id`;
+      const actorEntities = await Promise.all(
+        actors.map(name => 
+          Actor.findOrCreate({
+            where: { name },
+            defaults: { name } as CreationAttributes<Actor>, // Используем CreationAttributes
+            transaction: t,
+          })
+        )
+      );
+  
+      await movie.$set('actors', actorEntities.map(([actor]) => actor), { transaction: t });
+  
+      if (!transaction) {
+        await t.commit();
+      }
+  
+      return movie;
+    } catch (error) {
+      if (!transaction) {
+        await t.rollback();
+      }
+      throw error;
     }
   }
+  
 
-  // Основной запрос для получения данных
-  const movies = await sequelize.query(`
-    SELECT 
-      m.id,
-      m.title,
-      m.year,
-      m.format,
-      m."createdAt",
-      m."updatedAt",
-      JSON_AGG(DISTINCT jsonb_build_object('id', a.id, 'name', a.name)) AS actors
-    FROM "Movies" m
-    ${joinClause}
-    ${whereClause}
-    GROUP BY m.id
-    ${havingClause}
-    ORDER BY m.${allowedSortFields} ${allowedSortFields}
-    LIMIT :limit
-    OFFSET :offset
-  `, {
-    replacements: params,
-    type: QueryTypes.SELECT,
-    model: Movie,
-    mapToModel: true
-  });
-
-  // Запрос для получения общего количества
-  const totalResult = await sequelize.query(`
-    SELECT COUNT(DISTINCT m.id) 
-    FROM "Movies" m
-    ${joinClause}
-    ${whereClause}
-  `, {
-    replacements: params,
-    type: QueryTypes.SELECT
-  });
-
-  const totalCount =movies.length
-    
+  async searchMovies(options: GetMoviesOptions): Promise<{
+    data: any[];
+    meta: { total: number };
+    status: number;
+  }> {
+    const { sort = 'year', order = 'ASC', limit = 10, offset = 0 } = options;
+  
+    // Валидация сортировки
+    const validSortFields = ['title', 'year', 'format'];
+    const sortField = validSortFields.includes(sort) ? sort : 'year';
+  
+    // Получаем общее количество фильмов
+    const total = await Movie.count();
+  
+    // Получаем фильмы с актерами
+    const movies = await Movie.findAll({
+      attributes: ['id', 'title', 'year', 'format', 'createdAt', 'updatedAt'],
+      order: [[sortField, order]],
+      limit,
+      offset,
+      include: [
+        {
+          model: Actor,
+          attributes: ['name'],
+          through: { attributes: [] }, // Исключаем атрибуты промежуточной таблицы
+        },
+      ],
+    });
+  
+    // Форматируем данные
+    const formattedMovies = movies.map(movie => ({
+      id: movie.id,
+      title: movie.title,
+      year: movie.year,
+      format: movie.format,
+      createdAt: movie.createdAt,
+      updatedAt: movie.updatedAt,
+      actors: movie.actors?.map(actor => actor.name) || [], // Добавляем массив имен актеров
+    }));
+  
     return {
-      movies,
-      totalCount
+      data: formattedMovies,
+      meta: { total },
+      status: 1,
     };
   }
   
 
-  async updateMovie(
-    id: number,
-    data: UpdateMovieDto,
-    transaction?: Transaction
-  ): Promise<Movie> {
-    // Находим фильм с актерами
-    const movie = await Movie.findByPk(id, {
-      include: [Actor],
-      transaction
-    });
-
-    if (!movie) {
-      throw new Error('Movie not found');
+  async updateMovie(id: number, data: UpdateMovieDto, transaction?: Transaction): Promise<Movie> {
+    const t = transaction || await sequelize.transaction();
+  
+    try {
+      // Находим фильм без загрузки актеров
+      const movie = await Movie.findByPk(id, { transaction });
+      if (!movie) {
+        throw new Error('Movie not found');
+      }
+  
+      // Обновляем поля фильма
+      const updateData: Partial<Movie> = {};
+      if (data.title) updateData.title = data.title;
+      if (data.year) updateData.year = data.year;
+      if (data.format) updateData.format = data.format;
+  
+      await movie.update(updateData, { transaction });
+  
+      // Обновляем актеров, если переданы
+      if (data.actors) {
+        const uniqueActors = [...new Set(data.actors)];
+        logger.info('Unique actors for update:', uniqueActors);
+  
+        // Находим существующих актеров
+        const existingActors = await Actor.findAll({
+          where: { name: uniqueActors },
+          transaction,
+        });
+  
+        const existingActorNames = existingActors.map(actor => actor.name);
+        const newActorNames = uniqueActors.filter(name => !existingActorNames.includes(name));
+  
+        // Создаем новых актеров
+        const newActors = await Promise.all(
+          newActorNames.map(name =>
+            actorModel.create({ name }, { transaction })
+          )
+        );
+  
+        const allActors = [...existingActors, ...newActors];
+        logger.info('All actor IDs:', allActors.map(actor => actor.id));
+  
+        // Получаем текущие связи
+        const currentAssociations = await movieActorModel.findAll({
+          where: { movieId: id },
+          transaction,
+        });
+        const currentActorIds = currentAssociations.map(assoc => assoc.actorId);
+  
+        // Определяем актеров для добавления и удаления
+        const newActorIds = allActors.map(actor => actor.id);
+        const actorIdsToAdd = newActorIds.filter(id => !currentActorIds.includes(id));
+        const actorIdsToRemove = currentActorIds.filter(id => !newActorIds.includes(id));
+  
+        // Удаляем старые связи
+        if (actorIdsToRemove.length > 0) {
+          await MovieActor.destroy({
+            where: { movieId: id, actorId: actorIdsToRemove },
+            transaction,
+          });
+        }
+  
+        // Добавляем новые связи
+        if (actorIdsToAdd.length > 0) {
+          const records: ReadonlyArray<CreationAttributes<MovieActor>> = actorIdsToAdd.map(actorId => {
+            return {
+              movieId: id,
+              actorId: actorId,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            } as CreationAttributes<MovieActor>;
+          });
+          const options: BulkCreateOptions<Attributes<MovieActor>> = {
+            transaction,
+            validate: true,
+          };
+          await movieActorModel.bulkCreate(records, options);
+        }
+      }
+  
+      // Загружаем фильм с актерами
+      const updatedMovie = await Movie.findByPk(id, {
+        attributes: ['id', 'title', 'year', 'format', 'createdAt', 'updatedAt'],
+        include: [
+          {
+            model: Actor,
+            attributes: ['name'],
+            through: { attributes: [] },
+          },
+        ],
+        transaction,
+      });
+  
+      if (!updatedMovie) {
+        throw new Error('Movie not found after update');
+      }
+  
+      if (!transaction) {
+        await t.commit();
+      }
+  
+      return updatedMovie;
+    } catch (error) {
+      if (!transaction) {
+        await t.rollback();
+      }
+      logger.error('Update movie error:', error);
+      throw error;
     }
-
-    // Обновляем основные поля
-    if (data.title) movie.title = data.title;
-    if (data.year) movie.year = data.year;
-    if (data.format) movie.format = data.format;
-    
-
-    // Обновление связей с актерами
-    if (data.actors) {
-      // Находим или создаем актеров
-      const actorEntities = await Promise.all(
-        data.actors.map(name => 
-          actorModel.findOrCreate({
-            where: { name },
-            defaults: { name },
-            transaction
-          })
-        )
-      );
-
-      // Обновляем связи
-      await (movie as any).$set(
-        actorEntities.map(([actor]) => actor),
-        { transaction }
-      );
-    }
-
-    // Сохраняем изменения
-    await movie.save({ transaction });
-    
-    // Перезагружаем отношения
-    return movie.reload({
-      include: [Actor],
-      transaction
-    });
   }
   
   async findMovieById(id: number) { 
-    return Movie.findByPk(id);
+    return movieModel.findByPk(id);
   }
 
   async removeMovie(id: number): Promise<boolean> {

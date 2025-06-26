@@ -1,14 +1,17 @@
-import { Table, Column, Model, ForeignKey } from 'sequelize-typescript';
+import { Column, Model, Table, ForeignKey } from 'sequelize-typescript';
 import Movie from './movie.model';
 import Actor from './actor.model';
 
-@Table({tableName: 'movie_actors'})
-export default class MovieActor extends Model<MovieActor> {
+
+@Table({ tableName: 'movie_actors' })
+class MovieActor extends Model<MovieActor> {
   @ForeignKey(() => Movie)
-  @Column
+  @Column({primaryKey: true})
   movieId!: number;
 
   @ForeignKey(() => Actor)
-  @Column
+  @Column({primaryKey: true})
   actorId!: number;
 }
+
+export default MovieActor;

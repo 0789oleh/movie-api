@@ -15,9 +15,8 @@ export function initializeModels(sequelize: Sequelize) {
     Actor,
     MovieActor,
     RefreshToken
-    // Добавьте все модели здесь
   ]);
 }
 
-// Экспортируйте все модели для удобства
+// Models export
 export { Movie, User, Session, Actor, MovieActor, RefreshToken };

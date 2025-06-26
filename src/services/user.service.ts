@@ -1,11 +1,13 @@
 import { createModelWrapper } from "../models/model-utils";
-import User  from "../models/user.model"
+import User  from "../models/user.model";
+import logger from "../config/logger";
 
 const userModel = createModelWrapper(User);
 
 
 export class UserService {
   updateUser(id: any, arg1: { refreshToken: any; }) {
+    logger.warn('Trying to call unimplemented method udateUser');
     throw new Error('Method not implemented.');
   }
 
@@ -16,7 +18,8 @@ export class UserService {
         name,
         password
       });
-        
+      
+      logger.info(`User ${name} is successsfuly created`);
       return user;
         
     } catch(error) {
@@ -25,6 +28,7 @@ export class UserService {
   }
 
   async findByEmail(email: string) {
+    logger.info(`Searching for user by email ${email}`);
     return User.findOne({where : {email}})
   }
 

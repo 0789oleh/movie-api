@@ -14,7 +14,7 @@
             "mode": "raw",
             "raw": "{\n  \"email\": \"petro@gmail.com\",\n  \"name\": \"Petrov Petro\",\n  \"password\": \"super-password\",\n  \"confirmPassword\": \"super-password\"\n}"
           },
-          "url": { "raw": "http://localhost:3000/api/v1/users", "protocol": "http", "host": ["localhost"], "port": "3000", "path": ["api","v1","users"] }
+          "url": { "raw": "http://localhost:8000/api/v1/users", "protocol": "http", "host": ["localhost"], "port": "3000", "path": ["api","v1","users"] }
         }
       },
       {
@@ -26,7 +26,7 @@
             "mode": "raw",
             "raw": "{\n  \"email\": \"petro@gmail.com\",\n  \"password\": \"super-password\"\n}"
           },
-          "url": { "raw": "http://localhost:3000/api/v1/sessions", "protocol": "http", "host": ["localhost"], "port": "3000", "path": ["api","v1","sessions"] }
+          "url": { "raw": "http://localhost:8000/api/v1/sessions", "protocol": "http", "host": ["localhost"], "port": "3000", "path": ["api","v1","sessions"] }
         }
       },
       {
@@ -38,7 +38,7 @@
             "mode": "raw",
             "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}"
           },
-          "url": { "raw": "http://localhost:3000/api/v1/auth/refresh", "protocol": "http", "host": ["localhost"], "port": "3000", "path": ["api","v1","auth","refresh"] }
+          "url": { "raw": "http://localhost:8000/api/v1/auth/refresh", "protocol": "http", "host": ["localhost"], "port": "3000", "path": ["api","v1","auth","refresh"] }
         }
       },
       {
@@ -50,7 +50,7 @@
             "mode": "raw",
             "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}"
           },
-          "url": { "raw": "http://localhost:3000/api/v1/auth/logout", "protocol": "http", "host": ["localhost"], "port": "3000", "path": ["api","v1","auth","logout"] }
+          "url": { "raw": "http://localhost:8000/api/v1/auth/logout", "protocol": "http", "host": ["localhost"], "port": "3000", "path": ["api","v1","auth","logout"] }
         }
       },
       {
@@ -58,7 +58,7 @@
         "request": {
           "method": "GET",
           "header": [],
-          "url": { "raw": "http://localhost:3000/api/v1/movies?page=1&limit=10", "protocol": "http", "host": ["localhost"], "port": "3000", "path": ["api","v1","movies"], "query": [{ "key": "page", "value": "1" }, { "key": "limit", "value": "10" }] }
+          "url": { "raw": "http://localhost:8000/api/v1/movies?page=1&limit=10", "protocol": "http", "host": ["localhost"], "port": "3000", "path": ["api","v1","movies"], "query": [{ "key": "page", "value": "1" }, { "key": "limit", "value": "10" }] }
         }
       },
       {
@@ -66,7 +66,7 @@
         "request": {
           "method": "GET",
           "header": [],
-          "url": { "raw": "http://localhost:3000/api/v1/movies/1", "protocol": "http", "host": ["localhost"], "port": "3000", "path": ["api","v1","movies","1"] }
+          "url": { "raw": "http://localhost:8000/api/v1/movies/1", "protocol": "http", "host": ["localhost"], "port": "3000", "path": ["api","v1","movies","1"] }
         }
       },
       {
@@ -75,13 +75,13 @@
           "method": "POST",
           "header": [
             { "key": "Content-Type", "value": "application/json" },
-            { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            { "key": "Authorization", "value": "{{accessToken}}" }
           ],
           "body": {
             "mode": "raw",
             "raw": "{\n  \"title\": \"Inception\",\n  \"releaseYear\": 2010,\n  \"format\": \"DVD\",\n  \"genres\": [\"Sci-Fi\", \"Thriller\"],\n  \"actors\": [\"Leonardo DiCaprio\", \"Joseph Gordon-Levitt\"]\n}"
           },
-          "url": { "raw": "http://localhost:3000/api/v1/movies", "protocol": "http", "host": ["localhost"], "port": "3000", "path": ["api","v1","movies"] }
+          "url": { "raw": "http://localhost:8000/api/v1/movies", "protocol": "http", "host": ["localhost"], "port": "3000", "path": ["api","v1","movies"] }
         }
       },
       {
@@ -90,13 +90,13 @@
           "method": "PUT",
           "header": [
             { "key": "Content-Type", "value": "application/json" },
-            { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            { "key": "Authorization", "value": "{{accessToken}}" }
           ],
           "body": {
             "mode": "raw",
             "raw": "{\n  \"title\": \"Inception Updated\",\n  \"genres\": [],\n  \"actors\": []\n}"
           },
-          "url": { "raw": "http://localhost:3000/api/v1/movies/1", "protocol": "http", "host": ["localhost"], "port": "3000", "path": ["api","v1","movies","1"] }
+          "url": { "raw": "http://localhost:8000/api/v1/movies/1", "protocol": "http", "host": ["localhost"], "port": "3000", "path": ["api","v1","movies","1"] }
         }
       },
       {
@@ -104,9 +104,9 @@
         "request": {
           "method": "DELETE",
           "header": [
-            { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            { "key": "Authorization", "value": "{{accessToken}}" }
           ],
-          "url": { "raw": "http://localhost:3000/api/v1/movies/1", "protocol": "http", "host": ["localhost"], "port": "3000", "path": ["api","v1","movies","1"] }
+          "url": { "raw": "http://localhost:8000/api/v1/movies/1", "protocol": "http", "host": ["localhost"], "port": "3000", "path": ["api","v1","movies","1"] }
         }
       },
       {
@@ -114,7 +114,7 @@
         "request": {
           "method": "POST",
           "header": [
-            { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            { "key": "Authorization", "value": "{{accessToken}}" }
           ],
           "body": {
             "mode": "formdata",
@@ -122,7 +122,7 @@
               { "key": "file", "type": "file", "src": "" }
             ]
           },
-          "url": { "raw": "http://localhost:3000/api/v1/movies/import", "protocol": "http", "host": ["localhost"], "port": "3000", "path": ["api","v1","movies","import"] }
+          "url": { "raw": "http://localhost:8000/api/v1/movies/import", "protocol": "http", "host": ["localhost"], "port": "3000", "path": ["api","v1","movies","import"] }
         }
       }
     ],

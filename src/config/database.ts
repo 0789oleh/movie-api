@@ -2,18 +2,21 @@ import { Sequelize } from 'sequelize-typescript';
 import { Config } from './env.config';
 import { initializeModels } from '../models'; // Путь к вашему index.ts
 import * as models from '../models';
+import logger from './logger';
 
 export const sequelize = new Sequelize({
   dialect: 'sqlite',
   storage: Config.DB_STORAGE,
-  logging: process.env.LOG_LEVEL === 'debug' ? console.log : false,
+  logging: process.env.LOG_LEVEL === 'debug' ? logger.info : false,
   // УБРАТЬ автоматическую загрузку моделей отсюда!
 });
 
 export async function initializeDatabase() {
+  logger.debug(`ACCESS_TOKEN_SECRET exists: ${Config.JWT_ACCESS_SECRET}`);
+  logger.debug(`REFRESH_TOKEN_SECRET exists: ${Config.JWT_REFRESH_SECRET}`);
   try {
     await sequelize.authenticate();
-    console.log('Database connection established');
+    logger.info('Database connection established');
     
     if (sequelize.getDialect() === 'sqlite') {
       await sequelize.query('PRAGMA foreign_keys = OFF');
@@ -28,15 +31,15 @@ export async function initializeDatabase() {
     
     // Синхронизация структуры БД
     await sequelize.sync({ alter: false });
-    console.log('Database synchronized');
+    logger.debug('Database synchronized');
     
     // Теперь устанавливаем ассоциации ПОСЛЕ синхронизации
     setupAssociations();
-    console.log('Associations established');
+    logger.debug('Associations established');
     
-    console.log('Loaded models:', sequelize.modelManager.models.map(m => m.name));
+    logger.debug('Loaded models:', sequelize.modelManager.models.map(m => m.name));
   } catch (error) {
-    console.error('Database initialization failed:', error);
+    logger.error('Database initialization failed:', error);
     process.exit(1);
   }
 }

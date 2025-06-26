@@ -28,42 +28,47 @@ const upload = multer({
 });
 
 export const createMovie = async (req: Request, res: Response) => {
+  console.log('Request body:', req.body);
   try {
-    const dto: CreateMovieDto = req.body;
-
-    CreateMovieDto.validate(dto);
-
-    const result = await movieService.createMovie(dto);
+    const dto = CreateMovieDto.validate(req.body);
+    const movie = await movieService.createMovie(dto);
+    res.status(201).json(movie);
   } catch (error: any) {
-    if (error instanceof Error) {
-      res.status(400).json({ error: error.message });
-    } else {
-      res.status(500).json({ error: 'Unexpected error' });
-    }
+    console.error('Create movie error:', error);
+    res.status(400).json({ error: error.message });
   }
+};
 
-}
-
-export const updateMovie = async (req: Request, res: Response) => {
+export const updateMovie = async (req: Request, res: Response): Promise<void> => {
+  console.log('Movie ID:', req.params.id, 'Request body:', req.body);
   try {
-    const movieId = parseInt(req.params.id, 10);
-    if (isNaN(movieId)) {
+    const id = parseInt(req.params.id, 10);
+    if (isNaN(id)) {
       res.status(400).json({ error: 'Invalid movie ID' });
+      return;
     }
 
-    // Для примера - реальную валидацию нужно делать через DTO
-    const updateData: UpdateMovieDto = req.body;
+    const dto = UpdateMovieDto.validate(req.body);
+    console.log('Validated DTO:', dto);
 
-    UpdateMovieDto.validate(updateData);
+    const movie = await movieService.updateMovie(id, dto);
+    const formattedMovie = {
+      id: movie.id,
+      title: movie.title,
+      year: movie.year,
+      format: movie.format,
+      createdAt: movie.createdAt,
+      updatedAt: movie.updatedAt,
+      actors: movie.actors?.map(actor => actor.name) || [],
+    };
 
-    const updatedMovie = await movieService.updateMovie(movieId, updateData);
-    res.json(updatedMovie);
+    res.status(200).json({
+      data: formattedMovie,
+      status: 1,
+    });
   } catch (error: any) {
-    if (error instanceof Error) {
-      res.status(400).json({ error: error.message });
-    } else {
-      res.status(500).json({ error: 'Unexpected error' });
-    }
+    console.error('Update movie error:', error);
+    res.status(400).json({ error: error.message });
   }
 };
 
@@ -86,41 +91,59 @@ export const deleteMovie = async (req: Request, res: Response) => {
 
 
 export const findMovies = async (req: Request, res: Response) => {
+  console.log('Query params:', req.query);
   try {
-    const searchDto: MovieSearchDto = req.query;
-    const result = await movieService.searchMovies(searchDto);
-    
-    res.json({
-      data: result.movies,
-      meta: {
-        total: result.totalCount,
-        limit: searchDto.limit || 10,
-        offset: searchDto.offset || 0
-      }
+    const { sort = 'year', order = 'ASC', limit = '10', offset = '0' } = req.query;
+
+    const result = await movieService.searchMovies({
+      sort: sort as string,
+      order: order as 'ASC' | 'DESC',
+      limit: parseInt(limit as string, 10),
+      offset: parseInt(offset as string, 10),
     });
+
+    res.status(200).json(result);
   } catch (error: any) {
+    console.error('Get movies error:', error);
     res.status(400).json({ error: error.message });
   }
-}
+};
 
-export const findMovieById = async (req: Request, res: Response) => {
+
+export const findMovieById = async (req: Request, res: Response): Promise<void> => {
+  console.log('Movie ID:', req.params.id);
   try {
-    const movieId = parseInt(req.params.id, 10);
-    if (isNaN(movieId)) {
+    const id = parseInt(req.params.id, 10);
+    if (isNaN(id)) {
       res.status(400).json({ error: 'Invalid movie ID' });
+      return;
     }
-    
-    const movie = movieService.findMovieById(movieId);
-    res.json(movie);
-  } catch (error: any) {
-    if (error instanceof Error) {
-      res.status(400).json({ error: error.message });
-    } else {
-      res.status(500).json({ error: 'Unexpected error' });
-    }
-  }
-}
 
+    const movie = await movieService.findMovieById(id);
+    if (!movie) {
+      res.status(404).json({ error: 'Movie not found' });
+      return;
+    }
+
+    const formattedMovie = {
+      id: movie.id,
+      title: movie.title,
+      year: movie.year,
+      format: movie.format,
+      createdAt: movie.createdAt,
+      updatedAt: movie.updatedAt,
+      actors: movie.actors?.map(actor => actor.name) || [],
+    };
+
+    res.status(200).json({
+      data: formattedMovie,
+      status: 1,
+    });
+  } catch (error: any) {
+    console.error('Get movie by ID error:', error);
+    res.status(400).json({ error: error.message });
+  }
+};
 
 export const importMovies = async (req: Request, res: Response, next: NextFunction) => {
   try {

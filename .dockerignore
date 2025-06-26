@@ -3,6 +3,6 @@
 /dist
 db.sqlite
 package-lock.json
-migrations
+/migrations
 /logs
-.env
+postman.json

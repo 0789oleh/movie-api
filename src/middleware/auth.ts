@@ -2,8 +2,8 @@ import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { Config } from '../config/env.config';
 import { verifyToken } from '../utils/jwt.utils';
+import logger from '../config/logger';
 
-// Расширение типа Request для добавления свойства user
 declare global {
   namespace Express {
     interface Request {
@@ -18,40 +18,34 @@ declare global {
 const authMiddleware = (req: Request, res: Response, next: NextFunction): void => {
   // 1. Получаем заголовок Authorization
   const authHeader = req.headers.authorization;
-  
+  logger.info('Full authorization header:', authHeader);
   // 2. Проверяем наличие и формат заголовка
   if (!authHeader) {
     res.status(401).json({ error: 'Authorization header is missing' });
     return;
   }
   
-  // 3. Проверяем формат: должен быть "Bearer <token>"
-  const [bearer, token] = authHeader.split(' ');
-  
-  if (bearer !== 'Bearer' || !token) {
-    res.status(401).json({ error: 'Invalid authorization format. Expected: Bearer <token>' });
-    return;
-  }
+  const token = authHeader;
   
   try {
-    // 4. Верифицируем токен
-    const decoded = verifyToken(token, 'access') as jwt.JwtPayload;
+    const decoded = verifyToken(token, 'access');
     
-    // 5. Проверяем наличие userId в payload
-    if (typeof decoded.userId !== 'number') {
-      res.status(401).json({ error: 'Invalid token payload: userId is missing or not a number' });
-      return;
+    // Payload check
+    if (typeof decoded === 'object' && 'userId' in decoded && typeof decoded.userId === 'number') {
+      req.user = {
+        id: decoded.userId
+      };
+      next();
+    } else {
+      logger.error('Invalid token payload:', decoded);
+      res.status(401).json({ 
+        error: 'Invalid token payload',
+        details: `Payload must contain numeric userId. Received: ${JSON.stringify(decoded)}`
+      });
     }
-    
-    // 6. Присваиваем пользователя объекту запроса
-    req.user = {
-      id: decoded.userId
-    };
-    
-    // 7. Передаем управление следующему middleware/контроллеру
-    next();
+  
   } catch (error) {
-    console.error('JWT Verification Error:', error);
+    logger.error('JWT Verification Error:', error);
     
     // 8. Детальная обработка ошибок верификации
     if (error instanceof jwt.TokenExpiredError) {
@@ -64,8 +58,8 @@ const authMiddleware = (req: Request, res: Response, next: NextFunction): void =
       return;
     }
     
-    // 9. Обработка прочих ошибок
-    res.status(500).json({ error: 'Internal server error during authentication' });
+    // 7. Все остальные ошибки также возвращают 401
+    res.status(401).json({ error: 'Authentication failed', details: error });
   }
 };
 
