@@ -1,4 +1,13 @@
+Register 
 
+curl --location 'http://localhost:8000/api/v1/users' \
+--header 'Content-Type: application/json' \
+--data-raw '{
+    "email": "petro@gmail.com",
+    "name": "Petrov Petro",
+    "password": "super-password",
+    "confirmPassword": "super-password"
+}'
 
 
 Login
