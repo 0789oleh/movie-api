@@ -35,10 +35,16 @@ export class AuthService {
     const { email, name, password, confirmPassword } = registerDto;
     logger.info(`Registering user with email ${email}`);
 
+    if(password.trim().length === 0) {
+      logger.error('Password is empty or contains only white spaces.');
+        throw new Error("Empplty password");
+    }
+
     if(password !== confirmPassword) {
       logger.error("Passwords don't match");
       throw new Error("Password don't match");
     }
+
     
     // Нормализация email
     const normalizedEmail = email.toLowerCase().trim();
