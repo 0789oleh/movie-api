@@ -1,6 +1,5 @@
 // src/dto/movie.dto.ts
-import { IsIn, IsNumber, IsOptional, IsString, Max, Min, validateSync } from 'class-validator';
-import MovieFormat from '../models/movie.model';
+import { IsIn, IsNumber, IsOptional, IsString, Matches, Max, Min, validateSync } from 'class-validator';
 import logger from '../config/logger';
 
 // Movie creation
@@ -17,10 +16,17 @@ export class CreateMovieDto {
   format!: string;
 
   @IsString({ each: true })
+  @Matches(
+    /^[a-zA-Zа-яА-Я]+[a-zA-Zа-яА-Я\s-,.]*$/, 
+    { 
+      each: true, 
+      message: `Each actor name must start with a letter and 
+      contain only letters, spaces, hyphens, commas, or periods` 
+    })
   actors!: string[];
 
   static validate(data: Partial<CreateMovieDto>) {
-    logger.info('Validating DTO:', data);
+    logger.info('Validating DTO:', data); 
     const dto = Object.assign(new CreateMovieDto(), data);
     const errors = validateSync(dto);
     logger.info('Validation errors:', errors);
@@ -39,18 +45,30 @@ export class CreateMovieDto {
 // Movie update
 export class UpdateMovieDto {
 
+  @IsOptional()
   @IsString()
   title?: string;
 
+  @IsOptional()
   @IsNumber()
   year?: number;
 
+  @IsOptional()
   @IsString()
   @IsIn(['VHS', 'DVD', 'Blu-ray'])
   format?: string;
 
 
-  actors?: string[];
+  @IsString({ each: true })
+  @Matches(
+    /^[a-zA-Zа-яА-Я]+[a-zA-Zа-яА-Я\s-,.]*$/, 
+    { 
+      each: true, 
+      message: `Each actor name must start with a letter and 
+      contain only letters, spaces, hyphens, commas, or periods` 
+    })
+  actors!: string[];
+
 
   static validate(data: Partial<UpdateMovieDto>) {
     const dto = Object.assign(new UpdateMovieDto(), data);
@@ -79,6 +97,8 @@ export class MovieResponseDto {
   actors: {
     id: number;
     name: string;
+    createdAt: Date;
+    updatedAt: Date;
   }[];
 }
 
@@ -105,7 +125,7 @@ export class MovieSearchDto {
   @IsOptional()
   @IsString()
   @IsIn(['ASC', 'DESC'])
-  order?: 'ASC' | 'DESC' = 'ASC';
+  order?: string = 'ASC';
 
   @IsOptional()
   @IsNumber()

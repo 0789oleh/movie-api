@@ -90,22 +90,24 @@ export const deleteMovie = async (req: Request, res: Response) => {
 }
 
 
-export const findMovies = async (req: Request, res: Response) => {
-  console.log('Query params:', req.query);
+export const findMovies = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { sort = 'year', order = 'ASC', limit = '10', offset = '0' } = req.query;
-
-    const result = await movieService.searchMovies({
-      sort: sort as string,
-      order: order as 'ASC' | 'DESC',
-      limit: parseInt(limit as string, 10),
-      offset: parseInt(offset as string, 10),
-    });
-
-    res.status(200).json(result);
-  } catch (error: any) {
-    console.error('Get movies error:', error);
-    res.status(400).json({ error: error.message });
+    console.log('Query params:', req.query);
+    const dto: MovieSearchDto = {
+      title: typeof req.query.title === 'string' ? req.query.title : undefined,
+      actor: typeof req.query.actor === 'string' ? req.query.actor : undefined,
+      search: typeof req.query.search === 'string' ? req.query.search : undefined,
+      sort: typeof req.query.sort === 'string' ? req.query.sort : 'title',
+      order: typeof req.query.order === 'string' && ['ASC', 'DESC'].includes(req.query.order.toUpperCase()) ? req.query.order : 'ASC',
+      limit: typeof req.query.limit === 'string' ? parseInt(req.query.limit, 10) : 10,
+      offset: typeof req.query.offset === 'string' ? parseInt(req.query.offset, 10) : 0,
+    };
+    console.log('DTO before service:', dto);
+    const result = await movieService.searchMovies(dto);
+    res.json(result);
+  } catch (error) {
+    console.error('Controller error:', error);
+    next(error);
   }
 };
 
@@ -125,18 +127,9 @@ export const findMovieById = async (req: Request, res: Response): Promise<void> 
       return;
     }
 
-    const formattedMovie = {
-      id: movie.id,
-      title: movie.title,
-      year: movie.year,
-      format: movie.format,
-      createdAt: movie.createdAt,
-      updatedAt: movie.updatedAt,
-      actors: movie.actors?.map(actor => actor.name) || [],
-    };
-
+    
     res.status(200).json({
-      data: formattedMovie,
+      data: movie,
       status: 1,
     });
   } catch (error: any) {

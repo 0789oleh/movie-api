@@ -1,10 +1,9 @@
-import  Op from 'sequelize-typescript';
-import { Attributes, BulkCreateOptions, CreationAttributes, Optional, QueryTypes } from 'sequelize'
+import { Attributes, Op, BulkCreateOptions, CreationAttributes, Optional, QueryTypes } from 'sequelize';
 import { Transaction } from 'sequelize';
 import WhereOptions from 'sequelize-typescript';
 import Movie from '../models/movie.model';
 import Actor, { ActorAttributes } from '../models/actor.model';
-import { CreateMovieDto, MovieSearchDto, UpdateMovieDto } from '../dto/movie.dto';
+import { CreateMovieDto, MovieResponseDto, MovieSearchDto, UpdateMovieDto } from '../dto/movie.dto';
 import { sequelize } from '../config/database';
 import { createModelWrapper } from '../models/model-utils';
 import { NullishPropertiesOf } from 'sequelize/types/utils';
@@ -45,7 +44,7 @@ class MovieService {
           })
         )
       );
-  
+
       await movie.$set('actors', actorEntities.map(([actor]) => actor), { transaction: t });
   
       if (!transaction) {
@@ -61,52 +60,152 @@ class MovieService {
     }
   }
   
-
-  async searchMovies(options: GetMoviesOptions): Promise<{
-    data: any[];
+  async searchMovies(dto: MovieSearchDto & { caseSensitive?: boolean }): Promise<{
+    data: MovieResponseDto[];
     meta: { total: number };
     status: number;
   }> {
-    const { sort = 'year', order = 'ASC', limit = 10, offset = 0 } = options;
+    const { title, actor, search, sort = 'title', order = 'ASC', limit = 10, offset = 0, caseSensitive = false } = dto;
   
-    // Валидация сортировки
-    const validSortFields = ['title', 'year', 'format'];
-    const sortField = validSortFields.includes(sort) ? sort : 'year';
+    const validSortFields = ['title', 'year', 'id', 'createdAt'];
+    const sortField = validSortFields.includes(sort) ? sort : 'title';
+    const orderDirection = order.toUpperCase() === 'DESC' ? 'DESC' : 'ASC';
+    const sortExpression = caseSensitive || sortField !== 'title' ? `m.${sortField}` : `LOWER(m.${sortField})`;
   
-    // Получаем общее количество фильмов
-    const total = await Movie.count();
+    // Формируем условия WHERE
+    const whereConditions: string[] = [];
+    const params: any = { limit, offset };
   
-    // Получаем фильмы с актерами
-    const movies = await Movie.findAll({
-      attributes: ['id', 'title', 'year', 'format', 'createdAt', 'updatedAt'],
-      order: [[sortField, order]],
-      limit,
-      offset,
-      include: [
-        {
-          model: Actor,
-          attributes: ['name'],
-          through: { attributes: [] }, // Исключаем атрибуты промежуточной таблицы
-        },
-      ],
-    });
+    if (title) {
+      whereConditions.push('LOWER(m.title) LIKE LOWER(:title)');
+      params.title = `%${title}%`;
+    }
   
-    // Форматируем данные
-    const formattedMovies = movies.map(movie => ({
-      id: movie.id,
-      title: movie.title,
-      year: movie.year,
-      format: movie.format,
-      createdAt: movie.createdAt,
-      updatedAt: movie.updatedAt,
-      actors: movie.actors?.map(actor => actor.name) || [], // Добавляем массив имен актеров
-    }));
+    if (search && !actor) {
+      whereConditions.push(`(LOWER(m.title) LIKE LOWER(:search) OR LOWER(a.name) LIKE LOWER(:search))`);
+      params.search = `%${search}%`;
+    } else if (search) {
+      whereConditions.push(`LOWER(m.title) LIKE LOWER(:search)`);
+      params.search = `%${search}%`;
+    }
   
-    return {
-      data: formattedMovies,
-      meta: { total },
-      status: 1,
-    };
+    if (actor) {
+      whereConditions.push('LOWER(a.name) LIKE LOWER(:actor)');
+      params.actor = `%${actor}%`;
+    }
+  
+    const whereClause = whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : '';
+  
+    // Подзапрос для получения ID фильмов
+    const subQuery = `
+      SELECT DISTINCT m.id
+      FROM Movies m
+      ${actor ? 'INNER JOIN' : 'LEFT JOIN'} movie_actors ma ON m.id = ma.movieId
+      ${actor ? 'INNER JOIN' : 'LEFT JOIN'} Actors a ON ma.actorId = a.id
+      ${whereClause}
+    `;
+  
+    // Основной запрос для получения фильмов и всех актеров
+    const query = `
+      SELECT 
+        m.id AS movie_id,
+        m.title,
+        m.year,
+        m.format,
+        m.createdAt AS movie_createdAt,
+        m.updatedAt AS movie_updatedAt,
+        a.id AS actor_id,
+        a.name AS actor_name,
+        a.createdAt AS actor_createdAt,
+        a.updatedAt AS actor_updatedAt
+      FROM Movies m
+      LEFT JOIN movie_actors ma ON m.id = ma.movieId
+      LEFT JOIN Actors a ON ma.actorId = a.id
+      WHERE m.id IN (${subQuery})
+      ORDER BY ${sortExpression} ${orderDirection}
+      LIMIT :limit OFFSET :offset
+    `;
+  
+    // Запрос для подсчета общего количества
+    const countQuery = `
+      SELECT COUNT(DISTINCT m.id) as total
+      FROM Movies m
+      ${actor ? 'INNER JOIN' : 'LEFT JOIN'} movie_actors ma ON m.id = ma.movieId
+      ${actor ? 'INNER JOIN' : 'LEFT JOIN'} Actors a ON ma.actorId = a.id
+      ${whereClause}
+    `;
+  
+    // Логируем входные параметры, параметры и SQL-запросы
+    console.log('Search DTO:', dto);
+    console.log('Query Params:', params);
+    console.log('SQL Query:', query.replace(/:(\w+)/g, (match, p1) => `'${params[p1] || match}'`));
+    console.log('Count Query:', countQuery.replace(/:(\w+)/g, (match, p1) => `'${params[p1] || match}'`));
+  
+    // Выполняем подзапрос отдельно для отладки
+    try {
+      const subQueryResult = await sequelize.query(subQuery, {
+        replacements: params,
+        type: 'SELECT',
+      });
+      console.log('SubQuery Result:', subQueryResult);
+    } catch (error) {
+      console.error('SubQuery error:', error);
+    }
+  
+    // Выполняем запросы
+    try {
+      const [moviesResult, countResult] = await Promise.all([
+        sequelize.query(query, {
+          replacements: params,
+          type: 'SELECT',
+        }),
+        sequelize.query(countQuery, {
+          replacements: params,
+          type: 'SELECT',
+        }),
+      ]);
+  
+      // Логируем сырые результаты
+      console.log('Movies Result:', moviesResult);
+      console.log('Count Result:', countResult);
+  
+      // Форматируем результаты
+      const moviesMap = new Map<number, MovieResponseDto>();
+      (moviesResult as any[]).forEach(row => {
+        const movieId = row.movie_id;
+        if (!moviesMap.has(movieId)) {
+          moviesMap.set(movieId, {
+            id: movieId,
+            title: row.title,
+            year: row.year,
+            format: row.format,
+            createdAt: row.movie_createdAt ? new Date(row.movie_createdAt) : new Date(),
+            updatedAt: row.movie_updatedAt ? new Date(row.movie_updatedAt) : new Date(),
+            actors: [],
+          });
+        }
+        if (row.actor_id && row.actor_name) {
+          moviesMap.get(movieId)!.actors.push({
+            id: row.actor_id,
+            name: row.actor_name,
+            createdAt: row.actor_createdAt ? new Date(row.actor_createdAt) : new Date(),
+            updatedAt: row.actor_updatedAt ? new Date(row.actor_updatedAt) : new Date(),
+          });
+        }
+      });
+  
+      const formattedMovies = Array.from(moviesMap.values());
+      const total = (countResult[0] as any).total || 0;
+  
+      return {
+        data: formattedMovies,
+        meta: { total },
+        status: 1,
+      };
+    } catch (error) {
+      console.error('Search movies error:', error);
+      throw new Error(`Failed to search movies: ${error}`);
+    }
   }
   
 
@@ -221,8 +320,36 @@ class MovieService {
     }
   }
   
-  async findMovieById(id: number) { 
-    return movieModel.findByPk(id);
+  async findMovieById(id: number): Promise<MovieResponseDto | null> {
+    const movie = await Movie.findByPk(id, {
+      attributes: ['id', 'title', 'year', 'format', 'createdAt', 'updatedAt'],
+      include: [
+        {
+          model: Actor,
+          attributes: ['id', 'name', 'createdAt', 'updatedAt'],
+          through: { attributes: [] },
+        },
+      ],
+    });
+    console.log('Found movie:', movie);
+    if (!movie) {
+      return null;
+    }
+    const response: MovieResponseDto = {
+      id: movie.id,
+      title: movie.title,
+      year: movie.year,
+      format: movie.format,
+      createdAt: movie.createdAt,
+      updatedAt: movie.updatedAt,
+      actors: movie.actors.map(actor => ({
+        id: actor.id,
+        name: actor.name,
+        createdAt: actor.createdAt,
+        updatedAt: actor.updatedAt,
+      })),
+    };
+    return response;
   }
 
   async removeMovie(id: number): Promise<boolean> {
